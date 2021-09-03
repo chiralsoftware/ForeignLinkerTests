@@ -9,6 +9,7 @@ import java.util.Optional;
 import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
 import jdk.incubator.foreign.CLinker;
+import static jdk.incubator.foreign.CLinker.C_FLOAT;
 import static jdk.incubator.foreign.CLinker.C_INT;
 import static jdk.incubator.foreign.CLinker.C_LONG;
 import static jdk.incubator.foreign.CLinker.C_POINTER;
@@ -214,6 +215,15 @@ public final class LibWebp {
                         MemoryAddress.class // pointer to be freed
                 ),
                 FunctionDescriptor.ofVoid(C_POINTER));
+        
+        ConfigPreset = loadMethodHandle(cLinker, libraryLookup, "WebPConfigPreset",
+                MethodType.methodType(int.class, // returns false in case of error 
+                        MemoryAddress.class, // WebPConfig *
+                        int.class, // WebPPreset preset - the enum
+                        float.class // quality
+                        ),
+                FunctionDescriptor.of(C_INT, C_POINTER, C_INT, C_FLOAT));
+                
     }
 
     private MethodHandle loadMethodHandle(CLinker cLinker, LibraryLookup libraryLookup,
@@ -246,5 +256,17 @@ public final class LibWebp {
      * void WebPFree(void* ptr);
      */
     public final MethodHandle Free;
+    
+    /** 
+     * Configure based on one of the preset image types. This is the
+     * best way to use WebP. I hope this function isn't inline
+    This function will initialize the configuration according to a predefined
+    set of parameters (referred to by 'preset') and a given quality factor.
+    This function can be called as a replacement to WebPConfigInit(). Will
+    return false in case of error.
+    static WEBP_INLINE int WebPConfigPreset(WebPConfig* config,
+                                        WebPPreset preset, float quality) 
+     */
+    public final MethodHandle ConfigPreset;
 
 }
