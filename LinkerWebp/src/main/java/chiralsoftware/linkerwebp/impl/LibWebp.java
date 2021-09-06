@@ -2,8 +2,11 @@ package chiralsoftware.linkerwebp.impl;
 
 import java.io.IOException;
 import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import static java.lang.invoke.MethodHandles.insertArguments;
 import java.lang.invoke.MethodType;
 import java.nio.ByteOrder;
+import static java.nio.ByteOrder.nativeOrder;
 import java.nio.file.Path;
 import java.util.Optional;
 import static java.util.logging.Level.WARNING;
@@ -18,9 +21,14 @@ import jdk.incubator.foreign.GroupLayout;
 import jdk.incubator.foreign.LibraryLookup;
 import jdk.incubator.foreign.MemoryAddress;
 import jdk.incubator.foreign.MemoryLayout;
+import static jdk.incubator.foreign.MemoryLayout.ofPaddingBits;
+import static jdk.incubator.foreign.MemoryLayout.ofValueBits;
 
 /**
- * Interface to LibWebp
+ * Interface to LibWebp.
+ * Note: there will be some changes with JDK 17. See:
+ * https://blog.arkey.fr/2021/09/04/a-practical-look-at-jep-412-in-jdk17-with-libsodium/
+ * for a good reference on that.
  */
 public final class LibWebp {
 
@@ -31,6 +39,9 @@ public final class LibWebp {
     private final LibraryLookup libraryLookup;
 
     private static final LibWebp libWebp;
+    
+    /** Unfortunately this has to be hard-coded */
+    public static final int WEBP_ENCODER_ABI_VERSION = 0x020e;
 
     static {
         try {
@@ -48,28 +59,28 @@ public final class LibWebp {
     /**
      * Match the struct WebPConfig definition
      */
-    static final GroupLayout Config
+    public static final GroupLayout Config
             = MemoryLayout.ofStruct(
                     // Lossless encoding (0=lossy(default), 1=lossless).
-                    MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("lossless"),
+                    ofValueBits(32, nativeOrder()).withName("lossless"),
                     // between 0 and 100. For lossy, 0 gives the smallest
                     // size and 100 the largest. For lossless, this
                     // parameter is the amount of effort put into the
                     // compression: 0 is the fastest but gives larger
                     // files compared to the slowest, but best, 100.
-                    MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("quality"),
+                    ofValueBits(32, nativeOrder()).withName("quality"),
                     // Hint for image type (lossless only for now).
                     // this is represented as an int i think?
-                    MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("image_hint"),
+                    ofValueBits(32, nativeOrder()).withName("image_hint"),
                     // Parameters related to lossy compression only:
                     // if non-zero, set the desired target size in bytes.
                     // Takes precedence over the 'compression' parameter.
-                    MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("target_size"),
+                    ofValueBits(32, nativeOrder()).withName("target_size"),
                     // if non-zero, specifies the minimal distortion to
                     // try to achieve. Takes precedence over target_size.
-                    MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("target_PSNR"),
+                    ofValueBits(32, nativeOrder()).withName("target_PSNR"),
                     // maximum number of segments to use, in [1..4]
-                    MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("segments"),
+                    ofValueBits(32, nativeOrder()).withName("segments"),
                     // Spatial Noise Shaping. 0=off, 100=maximum.
                     MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("sns_strength"),
                     // range: [0 = off .. 100 = strongest]
@@ -107,39 +118,52 @@ public final class LibWebp {
                     MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("use_sharp_yuv")
             ).withBitAlignment(64);
 
-    static final GroupLayout Picture = MemoryLayout.ofStruct(
+    public static final GroupLayout Picture = MemoryLayout.ofStruct(
             // To select between ARGB and YUVA input.
-            MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("use_argb"),
+            ofValueBits(32, ByteOrder.nativeOrder()).withName("use_argb"),
             // Used if use_argb = 0
             // colorspace: should be YUVA420 or YUV420 for now (=Y'CbCr).
-            MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("colorspace"),
+            ofValueBits(32, ByteOrder.nativeOrder()).withName("colorspace"),
             // width
-            MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("width"),
+            ofValueBits(32, ByteOrder.nativeOrder()).withName("width"),
             // height
-            MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("height"),
+            ofValueBits(32, ByteOrder.nativeOrder()).withName("height"),
             // pointers to uint8_t (unsigned byte) luma / chroma planes
-            MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("y"),
-            MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("u"),
-            MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("v"),
+            ofValueBits(32, ByteOrder.nativeOrder()).withName("y"),
+            ofValueBits(32, ByteOrder.nativeOrder()).withName("u"),
+            ofValueBits(32, ByteOrder.nativeOrder()).withName("v"),
             // luma/chroma strides.
-            MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("y_stride"),
-            MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("uv_stride"),
+            ofValueBits(32, ByteOrder.nativeOrder()).withName("y_stride"),
+            ofValueBits(32, ByteOrder.nativeOrder()).withName("uv_stride"),
+            ofPaddingBits(3 * 32), // padding for later use
             // pointer to the alpha plane uint8_t 
-            MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("a"),
-            MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("a_stride"),
+            ofValueBits(32, ByteOrder.nativeOrder()).withName("a"),
+            ofValueBits(32, ByteOrder.nativeOrder()).withName("a_stride"),
             // Alternate ARGB input, recommended for lossless compression.
             //
             // Used if use_argb = 1.
             // Pointer to argb (32 bit) plane, uint32_t* argb
-            MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("argb"),
+            ofValueBits(32, ByteOrder.nativeOrder()).withName("argb"),
             // This is stride in pixels units, not bytes.
-            MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("argb_stride"),
+            ofValueBits(32, ByteOrder.nativeOrder()).withName("argb_stride"),
             // Byte-emission hook, to store compressed bytes as they are ready.
-            MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("writer"), // can be null
-            MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("custom_ptr"), // *void
-
+            ofValueBits(32, ByteOrder.nativeOrder()).withName("writer"), // can be null
+            ofValueBits(32, ByteOrder.nativeOrder()).withName("custom_ptr"), // *void
+            ofValueBits(32, ByteOrder.nativeOrder()).withName("extra_info_type"), 
+            ofValueBits(32, ByteOrder.nativeOrder()).withName("extra_info"), // pointer to extra info 
+            ofValueBits(32, nativeOrder()).withName("stats"), // WebPAuxStats* stats
             // Error code for the latest error encountered during encoding
-            MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("error_code")
+            ofValueBits(32, ByteOrder.nativeOrder()).withName("error_code"),
+            ofValueBits(32, nativeOrder()).withName("progress_hook"), // WebPProgressHook
+            ofValueBits(32, nativeOrder()).withName("user_data"), // void* user_data
+            ofPaddingBits(32 * 3), // padding for later use
+            ofPaddingBits(32), // *pad4
+            ofPaddingBits(32), // *pad5
+            ofPaddingBits(32 * 8), // pad6
+            // PRIVATE FIELDS
+            ofValueBits(32, nativeOrder()).withName("memoyr_"), // row chunk of memory for yuv
+            ofValueBits(32, nativeOrder()).withName("memory_argb_"), // and for argb
+            ofValueBits(32 * 2, nativeOrder()) // padding for later use
     ).withBitAlignment(64);
 
     public static enum ImageHint {
@@ -149,6 +173,20 @@ public final class LibWebp {
         GRAPH, // Discrete tone image (graph, map-tile etc).
         LAST
     }
+    
+    public static enum Preset {
+  DEFAULT("default preset"),
+  PICTURE("digital picture, like portrait, inner shot"),
+  PHOTO("outdoor photograph, with natural lighting"),
+  DRAWING("hand or line drawing, with high-contrast details"),
+  ICON("small-sized colorful images"), 
+  TEXT("text-like");
+  private Preset(String s) { 
+      this.description = s;
+  }
+  public String description() { return description; }
+  private final String description;
+          }
 
     public static enum EncodingError {
         VP8_ENC_OK(null),
@@ -215,15 +253,31 @@ public final class LibWebp {
                         MemoryAddress.class // pointer to be freed
                 ),
                 FunctionDescriptor.ofVoid(C_POINTER));
-        
-        ConfigPreset = loadMethodHandle(cLinker, libraryLookup, "WebPConfigPreset",
+
+        // annoyingly, the WebPConfigPreset function we would like to access
+        // is defined as an inline
+        // int WebPConfigInitInternal(WebPConfig*, WebPPreset, float, int);
+        ConfigInitInternal = loadMethodHandle(cLinker, libraryLookup, "WebPConfigInitInternal",
                 MethodType.methodType(int.class, // returns false in case of error 
                         MemoryAddress.class, // WebPConfig *
                         int.class, // WebPPreset preset - the enum
-                        float.class // quality
+                        float.class, // quality
+                        int.class  // WEBP_ENCODER_ABI_VERSION
                         ),
-                FunctionDescriptor.of(C_INT, C_POINTER, C_INT, C_FLOAT));
-                
+                FunctionDescriptor.of(C_INT, C_POINTER, C_INT, C_FLOAT, C_INT));
+        
+        PictureInitInternal = loadMethodHandle(cLinker, libraryLookup, "WebPPictureInitInternal", 
+                MethodType.methodType(int.class, MemoryAddress.class, // Picture 
+                        int.class // WEBP_ENCODER_ABI_VERSION
+                ), FunctionDescriptor.of(C_INT, C_POINTER, C_INT));
+        
+        PictureInit = insertArguments(PictureInitInternal, 1, WEBP_ENCODER_ABI_VERSION);
+        
+        ConfigPreset = insertArguments(ConfigInitInternal, 3, WEBP_ENCODER_ABI_VERSION);
+
+        // this is kinda miraculous if this works
+        ConfigInit = insertArguments(ConfigInitInternal, 1, 
+                Preset.DEFAULT.ordinal(), 75f, WEBP_ENCODER_ABI_VERSION);
     }
 
     private MethodHandle loadMethodHandle(CLinker cLinker, LibraryLookup libraryLookup,
@@ -257,6 +311,13 @@ public final class LibWebp {
      */
     public final MethodHandle Free;
     
+    private final MethodHandle PictureInitInternal;
+    
+    /** Calls PictureInitInternal but with the ABI version constant */
+    public final MethodHandle PictureInit;
+
+    public final MethodHandle ConfigInitInternal;
+    
     /** 
      * Configure based on one of the preset image types. This is the
      * best way to use WebP. I hope this function isn't inline
@@ -266,7 +327,13 @@ public final class LibWebp {
     return false in case of error.
     static WEBP_INLINE int WebPConfigPreset(WebPConfig* config,
                                         WebPPreset preset, float quality) 
+
+    * FIXME - use MethodHandles.insertArguments to create a ConfigInit
+    * method that has the constant already bound to it! This is a cool use
      */
     public final MethodHandle ConfigPreset;
+    
+    /** Also an inline call t oConfigInitInternal, using the DEFAULT preset, and 75 quality level */
+    public final MethodHandle ConfigInit;
 
 }

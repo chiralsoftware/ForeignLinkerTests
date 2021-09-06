@@ -1,5 +1,6 @@
 package chiralsoftware.linkerwebp.impl;
 
+import chiralsoftware.linkerwebp.WebpUtils;
 import chiralsoftware.linkerwebp.WebpWriterSpi;
 import java.awt.image.DataBuffer;
 import java.awt.image.DataBufferByte;
@@ -18,6 +19,7 @@ import javax.imageio.metadata.IIOMetadata;
 import jdk.incubator.foreign.MemoryAccess;
 import jdk.incubator.foreign.MemoryAddress;
 import jdk.incubator.foreign.MemorySegment;
+import static jdk.incubator.foreign.MemorySegment.allocateNative;
 
 /**
  * Write a BufferedImage to a webp format
@@ -52,6 +54,31 @@ public final class WebpImageWriter extends ImageWriter {
     public IIOMetadata convertImageMetadata(IIOMetadata inData, ImageTypeSpecifier imageType, ImageWriteParam param) {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
+    
+    public void writeAdvanced(RenderedImage renderedImage) throws IOException {
+        final Raster raster = renderedImage.getData();
+        final DataBuffer dataBuffer = raster.getDataBuffer();
+        final DataBufferByte dataBufferByte = (DataBufferByte) dataBuffer;
+        LOG.info("it has this many banks: " + dataBufferByte.getNumBanks());
+        final byte[] bytes = dataBufferByte.getData();
+        LOG.info("it has this many bytes: "+ bytes.length);
+        // let's copy the bytes into a native segment
+        MemorySegment copied = MemorySegment.allocateNative(bytes.length);
+        copied.asByteBuffer().put(bytes);
+        final MemorySegment configSegment = 
+                allocateNative(LibWebp.Config);
+        try {
+            int result = (Integer) libWebp.ConfigInit.invoke(configSegment.address());
+            LOG.info("cool i just called config. result=" + result);
+            LOG.info("here is the config string: " + WebpUtils.showConfig(configSegment));
+            MemorySegment pictureSegment =
+                    allocateNative(libWebp.Picture);
+            result = (Integer) libWebp.PictureInit.invoke(pictureSegment.address());
+            LOG.info("Ok i init the picture, result is: "+ result);
+        } catch(Throwable t) {
+            throw new IOException("Oh no!", t);
+        }
+    }
 
     @Override
     public void write(IIOMetadata streamMetadata, IIOImage image, ImageWriteParam param) throws IOException {
@@ -59,6 +86,10 @@ public final class WebpImageWriter extends ImageWriter {
         // regular JPEGs read in by ImageIO don't have rasters
         
         final RenderedImage renderedImage = image.getRenderedImage();
+        if(true) {
+            writeAdvanced(renderedImage);
+            return;
+        }
         
 //        if(! image.hasRaster()) throw new IOException("the input image has no raster.");
         
