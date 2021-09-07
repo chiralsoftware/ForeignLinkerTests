@@ -1,6 +1,7 @@
 package chiralsoftware.linkerwebp.impl;
 
-import chiralsoftware.linkerwebp.WebpUtils;
+import chiralsoftware.linkerwebp.Config;
+import chiralsoftware.linkerwebp.Picture;
 import chiralsoftware.linkerwebp.WebpWriterSpi;
 import java.awt.image.DataBuffer;
 import java.awt.image.DataBufferByte;
@@ -66,15 +67,19 @@ public final class WebpImageWriter extends ImageWriter {
         MemorySegment copied = MemorySegment.allocateNative(bytes.length);
         copied.asByteBuffer().put(bytes);
         final MemorySegment configSegment = 
-                allocateNative(LibWebp.Config);
+                allocateNative(Config.Config);
         try {
             int result = (Integer) libWebp.ConfigInit.invoke(configSegment.address());
             LOG.info("cool i just called config. result=" + result);
-            LOG.info("here is the config string: " + WebpUtils.showConfig(configSegment));
+            final Config myConfig = new Config(configSegment);
+            LOG.info("here is the config string: " + myConfig);
             MemorySegment pictureSegment =
-                    allocateNative(libWebp.Picture);
+                    allocateNative(Picture.Picture);
             result = (Integer) libWebp.PictureInit.invoke(pictureSegment.address());
             LOG.info("Ok i init the picture, result is: "+ result);
+            final Picture picture = new Picture(pictureSegment);
+            picture.setUseArgb(99);
+            LOG.info("that should have worked");
         } catch(Throwable t) {
             throw new IOException("Oh no!", t);
         }
