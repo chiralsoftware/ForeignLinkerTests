@@ -123,125 +123,78 @@ public final class Picture {
         Picture.varHandle(int.class, groupElement("a_stride")).set(segment, i);
     }
     
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
+    /** ARGB input (mostly used for input to lossless compression). Note that
+     this is a pointer to an array of int*/
+    public void setArgb(MemoryAddress m) {
+        Picture.varHandle(MemoryAddress.class, groupElement("argb")).set(segment, m);
     }
     
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
+    /** This is stride in pixels units, not bytes. */
+    public void setArgbStride(int i) {
+        Picture.varHandle(int.class, groupElement("argb_stride")).set(segment, i);
     }
     
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
+    // OUTPUT
+    
+    /** Byte-emission hook, to store compressed bytes as they are ready.
+     It has type WebPWriterFunction */
+    public void setWriter(MemoryAddress m) {
+        Picture.varHandle(MemoryAddress.class, groupElement("writer")).set(segment, m);
     }
     
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
+    /** Can be used by the writer */
+    public void setCustomPtr(int m) {
+        Picture.varHandle(MemoryAddress.class, groupElement("custom_ptr")).set(segment, m);
     }
     
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
+    /** map for extra information (only for lossy compression mode)
+     * <ol>
+     * <li>intra type
+     * <li>segment
+     * <li>quant
+     * <li>intra-16 prediction mode,
+     * <li>chroma prediction mode,
+     * <li>bit cost,
+     * <li>distortion
+     * </ol>
+ */
+    public void setExtraInfoType(int i) {
+        Picture.varHandle(int.class, groupElement("extra_info_type")).set(segment, i);
     }
     
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
+    /** if not NULL, points to an array of size
+     * ((width + 15) / 16) * ((height + 15) / 16) that
+     * will be filled with a macroblock map, depending
+     * on extra_info_type. */
+    public void setExtraInfo(MemoryAddress m) {
+        Picture.varHandle(MemoryAddress.class, groupElement("extra_info")).set(segment, m);
     }
     
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
+    /// STATS AND REPORTS
+    
+    /** Pointer to side statistics (updated only if not NULL).
+     Type is WebPAuxStats* */
+    public void setStats(MemoryAddress m) {
+        Picture.varHandle(MemoryAddress.class, groupElement("stats")).set(segment, m);
     }
     
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
+    /** Error code for the latest error encountered during encoding,
+     type is WebPEncodingError */
+    public void setErrorCode(int i) {
+        Picture.varHandle(int.class, groupElement("error_code")).set(segment, i);
     }
     
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
+    /** If not NULL, report progress during encoding..
+     Type is WebPProgressHook */
+    public void setProgressHook(MemoryAddress m) {
+        Picture.varHandle(MemoryAddress.class, groupElement("progress_hook")).set(segment, m);
     }
     
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
+    /** this field is free to be set to any value and
+     * used during callbacks (like progress-report e.g.).  */
+    public void setUserData(MemoryAddress m) {
+        Picture.varHandle(MemoryAddress.class, groupElement("user_data")).set(segment, m);
     }
     
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
-    }
-    
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
-    }
-    
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
-    }
-    
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
-    }
-    
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
-    }
-    
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
-    }
-    
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
-    }
-    
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
-    }
-    
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
-    }
-    
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
-    }
-    
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
-    }
-    
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
-    }
-    
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
-    }
-    
-    /** */
-    public void set(int i) {
-        Picture.varHandle(int.class, groupElement("")).set(segment, i);
-    }
-    
-    
+    // other fields are private or unused
 }

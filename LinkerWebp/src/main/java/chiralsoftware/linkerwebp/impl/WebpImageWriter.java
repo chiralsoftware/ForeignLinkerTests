@@ -78,11 +78,17 @@ public final class WebpImageWriter extends ImageWriter {
             result = (Integer) libWebp.PictureInit.invoke(pictureSegment.address());
             LOG.info("Ok i init the picture, result is: "+ result);
             final Picture picture = new Picture(pictureSegment);
-            picture.setUseArgb(99);
-            LOG.info("that should have worked");
+            LOG.info("now set the relevant fields in the picture");
+            picture.setUseArgb(1); // for now we have to use ARGB
         } catch(Throwable t) {
             throw new IOException("Oh no!", t);
         }
+    }
+    
+    /** It's static for now so I can try it out */
+    public static int myWriter(MemoryAddress data, int dataSize, Picture picture) {
+        LOG.info("I i need to write: " + dataSize + " bytes!");
+        return 1; // write is always successful so far
     }
 
     @Override
