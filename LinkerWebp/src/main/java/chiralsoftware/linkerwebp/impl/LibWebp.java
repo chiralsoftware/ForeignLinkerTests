@@ -25,8 +25,7 @@ import static jdk.incubator.foreign.MemoryLayout.ofPaddingBits;
 import static jdk.incubator.foreign.MemoryLayout.ofValueBits;
 
 /**
- * Interface to LibWebp.
- * Note: there will be some changes with JDK 17. See:
+ * Interface to LibWebp. Note: there will be some changes with JDK 17. See:
  * https://blog.arkey.fr/2021/09/04/a-practical-look-at-jep-412-in-jdk17-with-libsodium/
  * for a good reference on that.
  */
@@ -39,8 +38,10 @@ public final class LibWebp {
     private final LibraryLookup libraryLookup;
 
     private static final LibWebp libWebp;
-    
-    /** Unfortunately this has to be hard-coded */
+
+    /**
+     * Unfortunately this has to be hard-coded
+     */
     public static final int WEBP_ENCODER_ABI_VERSION = 0x020e;
 
     static {
@@ -62,20 +63,24 @@ public final class LibWebp {
         PHOTO, // outdoor photograph, with natural lighting
         GRAPH // Discrete tone image (graph, map-tile etc).
     }
-    
+
     public static enum Preset {
-  DEFAULT("default preset"),
-  PICTURE("digital picture, like portrait, inner shot"),
-  PHOTO("outdoor photograph, with natural lighting"),
-  DRAWING("hand or line drawing, with high-contrast details"),
-  ICON("small-sized colorful images"), 
-  TEXT("text-like");
-  private Preset(String s) { 
-      this.description = s;
-  }
-  public String description() { return description; }
-  private final String description;
-          }
+        DEFAULT("default preset"),
+        PICTURE("digital picture, like portrait, inner shot"),
+        PHOTO("outdoor photograph, with natural lighting"),
+        DRAWING("hand or line drawing, with high-contrast details"),
+        ICON("small-sized colorful images"),
+        TEXT("text-like");
+
+        private Preset(String s) {
+            this.description = s;
+        }
+
+        public String description() {
+            return description;
+        }
+        private final String description;
+    }
 
     public static enum EncodingError {
         VP8_ENC_OK(null),
@@ -88,15 +93,19 @@ public final class LibWebp {
         VP8_ENC_ERROR_PARTITION_OVERFLOW("partition is bigger than 16M"),
         VP8_ENC_ERROR_BAD_WRITE("error while flushing bytes"),
         VP8_ENC_ERROR_FILE_TOO_BIG("file is bigger than 4G"),
-        VP8_ENC_ERROR_USER_ABORT("abort request by user"),
-        VP8_ENC_ERROR_LAST("list terminator. always last");  // should never be used        
+        VP8_ENC_ERROR_USER_ABORT("abort request by user");
 
         private EncodingError(String s) {
             message = s;
         }
         private final String message;
-        /** The associated message. This can be null in the case of VP8_ENC_OK */
-        public String message() { return message; }
+
+        /**
+         * The associated message. This can be null in the case of VP8_ENC_OK
+         */
+        public String message() {
+            return message;
+        }
     }
 
     private LibWebp() throws IOException {
@@ -151,22 +160,41 @@ public final class LibWebp {
                         MemoryAddress.class, // WebPConfig *
                         int.class, // WebPPreset preset - the enum
                         float.class, // quality
-                        int.class  // WEBP_ENCODER_ABI_VERSION
-                        ),
+                        int.class // WEBP_ENCODER_ABI_VERSION
+                ),
                 FunctionDescriptor.of(C_INT, C_POINTER, C_INT, C_FLOAT, C_INT));
-        
-        PictureInitInternal = loadMethodHandle(cLinker, libraryLookup, "WebPPictureInitInternal", 
+
+        PictureInitInternal = loadMethodHandle(cLinker, libraryLookup, "WebPPictureInitInternal",
                 MethodType.methodType(int.class, MemoryAddress.class, // Picture 
                         int.class // WEBP_ENCODER_ABI_VERSION
                 ), FunctionDescriptor.of(C_INT, C_POINTER, C_INT));
-        
+
         PictureInit = insertArguments(PictureInitInternal, 1, WEBP_ENCODER_ABI_VERSION);
-        
+
         ConfigPreset = insertArguments(ConfigInitInternal, 3, WEBP_ENCODER_ABI_VERSION);
 
         // this is kinda miraculous if this works
-        ConfigInit = insertArguments(ConfigInitInternal, 1, 
+        ConfigInit = insertArguments(ConfigInitInternal, 1,
                 Preset.DEFAULT.ordinal(), 75f, WEBP_ENCODER_ABI_VERSION);
+        
+//        int WebPPictureAlloc(WebPPicture* picture)
+        PictureAlloc = loadMethodHandle(cLinker, libraryLookup, "WebPPictureAlloc",
+                MethodType.methodType(int.class, MemoryAddress.class),
+                FunctionDescriptor.of(C_INT, C_POINTER));
+        
+        PictureImportRGB = loadMethodHandle(cLinker, libraryLookup, "WebPPictureImportRGB",
+                MethodType.methodType(int.class, MemoryAddress.class, MemoryAddress.class, int.class),
+                FunctionDescriptor.of(C_INT, C_POINTER, C_POINTER, C_INT));
+
+        PictureImportRGBA = loadMethodHandle(cLinker, libraryLookup, "WebPPictureImportRGBA",
+                MethodType.methodType(int.class, MemoryAddress.class, MemoryAddress.class, int.class),
+                FunctionDescriptor.of(C_INT, C_POINTER, C_POINTER, C_INT));
+        
+//        int WebPEncode(const WebPConfig* config, WebPPicture* picture)
+        Encode = loadMethodHandle(cLinker, libraryLookup, "WebPEncode", 
+                MethodType.methodType(int.class, MemoryAddress.class, MemoryAddress.class),
+                FunctionDescriptor.of(C_INT, C_POINTER, C_POINTER));
+        
     }
 
     private MethodHandle loadMethodHandle(CLinker cLinker, LibraryLookup libraryLookup,
@@ -175,7 +203,6 @@ public final class LibWebp {
         if (optionalSymbol.isEmpty())
             throw new IOException("couldn't library lookup for symbol: " + name);
         final MethodHandle mh = cLinker.downcallHandle(optionalSymbol.get(), methodType, functionDescriptor);
-        LOG.info("loaded this method handle: " + mh + " for symbol: " + name);
         return mh;
     }
 
@@ -199,30 +226,64 @@ public final class LibWebp {
      * void WebPFree(void* ptr);
      */
     public final MethodHandle Free;
-    
+
     private final MethodHandle PictureInitInternal;
-    
-    /** Calls PictureInitInternal but with the ABI version constant */
+
+    /**
+     * Calls PictureInitInternal but with the ABI version constant
+     */
     public final MethodHandle PictureInit;
 
     public final MethodHandle ConfigInitInternal;
-    
-    /** 
-     * Configure based on one of the preset image types. This is the
-     * best way to use WebP. I hope this function isn't inline
-    This function will initialize the configuration according to a predefined
-    set of parameters (referred to by 'preset') and a given quality factor.
-    This function can be called as a replacement to WebPConfigInit(). Will
-    return false in case of error.
-    static WEBP_INLINE int WebPConfigPreset(WebPConfig* config,
-                                        WebPPreset preset, float quality) 
 
-    * FIXME - use MethodHandles.insertArguments to create a ConfigInit
-    * method that has the constant already bound to it! This is a cool use
+    /**
+     * Configure based on one of the preset image types. This is the best way to
+     * use WebP. I hope this function isn't inline This function will initialize
+     * the configuration according to a predefined set of parameters (referred
+     * to by 'preset') and a given quality factor. This function can be called
+     * as a replacement to WebPConfigInit(). Will return false in case of error.
+     * static WEBP_INLINE int WebPConfigPreset(WebPConfig* config, WebPPreset
+     * preset, float quality)      *
+     * FIXME - use MethodHandles.insertArguments to create a ConfigInit method
+     * that has the constant already bound to it! This is a cool use
      */
     public final MethodHandle ConfigPreset;
-    
-    /** Also an inline call t oConfigInitInternal, using the DEFAULT preset, and 75 quality level */
+
+    /**
+     * Also an inline call t oConfigInitInternal, using the DEFAULT preset, and
+     * 75 quality level
+     */
     public final MethodHandle ConfigInit;
+    
+    /** Convenience allocation / deallocation based on picture->width/height:
+     * Allocate y/u/v buffers as per colorspace/width/height specification.
+     * Note! This function will free the previous buffer if needed.
+     * Returns false in case of memory error.
+     * 
+     * int WebPPictureAlloc(WebPPicture* picture); */
+    public final MethodHandle PictureAlloc;
+    
+    /** Colorspace conversion function to import RGB samples.
+     * Previous buffer will be free'd, if any.
+     *rgb buffer should have a size of at least height * rgb_stride.
+     * Returns false in case of memory error. */
+    public final MethodHandle PictureImportRGB;
+    
+    /** int WebPPictureImportRGBA(WebPPicture* picture, const uint8_t* rgba, int rgba_stride); */
+    public final MethodHandle PictureImportRGBA;
+    
+    /** Main encoding call, after config and picture have been initialized.
+     * 'picture' must be less than 16384x16384 in dimension (cf WEBP_MAX_DIMENSION),
+     * and the 'config' object must be a valid one.
+     * Returns false in case of error, true otherwise.
+     * In case of error, picture->error_code is updated accordingly.
+     * 'picture' can hold the source samples in both YUV(A) or ARGB input, depending
+     * on the value of 'picture->use_argb'. It is highly recommended to use
+     * the former for lossy encoding, and the latter for lossless encoding
+     * (when config.lossless is true). Automatic conversion from one format to
+     * another is provided but they both incur some loss.
+<pre>WEBP_EXTERN int WebPEncode(const WebPConfig* config, WebPPicture* picture);<pre>
+ */
+    public final MethodHandle Encode;
 
 }

@@ -29,40 +29,40 @@ public final class Picture {
             // height
             ofValueBits(32, ByteOrder.nativeOrder()).withName("height"),
             // pointers to uint8_t (unsigned byte) luma / chroma planes
-            ofValueBits(32, ByteOrder.nativeOrder()).withName("y"),
-            ofValueBits(32, ByteOrder.nativeOrder()).withName("u"),
-            ofValueBits(32, ByteOrder.nativeOrder()).withName("v"),
+            ofValueBits(8*8, ByteOrder.nativeOrder()).withName("y"),
+            ofValueBits(8*8, ByteOrder.nativeOrder()).withName("u"),
+            ofValueBits(8*8, ByteOrder.nativeOrder()).withName("v"),
             // luma/chroma strides.
             ofValueBits(32, ByteOrder.nativeOrder()).withName("y_stride"),
             ofValueBits(32, ByteOrder.nativeOrder()).withName("uv_stride"),
             ofPaddingBits(3 * 32), // padding for later use
             // pointer to the alpha plane uint8_t 
-            ofValueBits(32, ByteOrder.nativeOrder()).withName("a"),
+            ofValueBits(8*8, ByteOrder.nativeOrder()).withName("a"),
             ofValueBits(32, ByteOrder.nativeOrder()).withName("a_stride"),
             // Alternate ARGB input, recommended for lossless compression.
             //
             // Used if use_argb = 1.
             // Pointer to argb (32 bit) plane, uint32_t* argb
-            ofValueBits(32, ByteOrder.nativeOrder()).withName("argb"),
+            ofValueBits(8*8, ByteOrder.nativeOrder()).withName("argb"),
             // This is stride in pixels units, not bytes.
             ofValueBits(32, ByteOrder.nativeOrder()).withName("argb_stride"),
             // Byte-emission hook, to store compressed bytes as they are ready.
-            ofValueBits(32, ByteOrder.nativeOrder()).withName("writer"), // can be null
-            ofValueBits(32, ByteOrder.nativeOrder()).withName("custom_ptr"), // *void
-            ofValueBits(32, ByteOrder.nativeOrder()).withName("extra_info_type"), 
-            ofValueBits(32, ByteOrder.nativeOrder()).withName("extra_info"), // pointer to extra info 
-            ofValueBits(32, nativeOrder()).withName("stats"), // WebPAuxStats* stats
+            ofValueBits(8*8, ByteOrder.nativeOrder()).withName("writer"), // can be null
+            ofValueBits(8*8, ByteOrder.nativeOrder()).withName("custom_ptr"), // *void
+            ofValueBits(8*8, ByteOrder.nativeOrder()).withName("extra_info_type"), 
+            ofValueBits(8*8, ByteOrder.nativeOrder()).withName("extra_info"), // pointer to extra info 
+            ofValueBits(8*8, nativeOrder()).withName("stats"), // WebPAuxStats* stats
             // Error code for the latest error encountered during encoding
             ofValueBits(32, ByteOrder.nativeOrder()).withName("error_code"),
-            ofValueBits(32, nativeOrder()).withName("progress_hook"), // WebPProgressHook
-            ofValueBits(32, nativeOrder()).withName("user_data"), // void* user_data
+            ofValueBits(8*8, nativeOrder()).withName("progress_hook"), // WebPProgressHook
+            ofValueBits(8*8, nativeOrder()).withName("user_data"), // void* user_data
             ofPaddingBits(32 * 3), // padding for later use
             ofPaddingBits(32), // *pad4
             ofPaddingBits(32), // *pad5
             ofPaddingBits(32 * 8), // pad6
             // PRIVATE FIELDS
-            ofValueBits(32, nativeOrder()).withName("memoyr_"), // row chunk of memory for yuv
-            ofValueBits(32, nativeOrder()).withName("memory_argb_"), // and for argb
+            ofValueBits(8*8, nativeOrder()).withName("memoyr_"), // row chunk of memory for yuv
+            ofValueBits(8*8, nativeOrder()).withName("memory_argb_"), // and for argb
             ofValueBits(32 * 2, nativeOrder()) // padding for later use
     ).withBitAlignment(64);
 
@@ -138,8 +138,8 @@ public final class Picture {
     
     /** Byte-emission hook, to store compressed bytes as they are ready.
      It has type WebPWriterFunction */
-    public void setWriter(MemoryAddress m) {
-        Picture.varHandle(MemoryAddress.class, groupElement("writer")).set(segment, m);
+    public void setWriter(long a) {
+        Picture.varHandle(long.class, groupElement("writer")).set(segment, a);
     }
     
     /** Can be used by the writer */

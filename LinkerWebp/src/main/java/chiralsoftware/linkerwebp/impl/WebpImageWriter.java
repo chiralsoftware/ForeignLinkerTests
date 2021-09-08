@@ -9,6 +9,9 @@ import java.awt.image.Raster;
 import java.awt.image.RenderedImage;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.logging.Logger;
@@ -17,6 +20,10 @@ import javax.imageio.ImageTypeSpecifier;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
 import javax.imageio.metadata.IIOMetadata;
+import jdk.incubator.foreign.CLinker;
+import static jdk.incubator.foreign.CLinker.C_INT;
+import static jdk.incubator.foreign.CLinker.C_POINTER;
+import jdk.incubator.foreign.FunctionDescriptor;
 import jdk.incubator.foreign.MemoryAccess;
 import jdk.incubator.foreign.MemoryAddress;
 import jdk.incubator.foreign.MemorySegment;
@@ -78,15 +85,37 @@ public final class WebpImageWriter extends ImageWriter {
             result = (Integer) libWebp.PictureInit.invoke(pictureSegment.address());
             LOG.info("Ok i init the picture, result is: "+ result);
             final Picture picture = new Picture(pictureSegment);
+            libWebp.PictureInit.invoke(pictureSegment.address());
             LOG.info("now set the relevant fields in the picture");
-            picture.setUseArgb(1); // for now we have to use ARGB
+            picture.setUseArgb(0);
+            picture.setWidth(renderedImage.getWidth());
+            picture.setHeight(renderedImage.getHeight());
+            result = (Integer) libWebp.PictureAlloc.invoke(pictureSegment.address());
+            LOG.info("the result is: " + result);
+            // now i can import the RGB data
+            // PictureImportRGBA(WebPPicture* picture, const uint8_t* rgba, int rgba_stride); 
+            result = (Integer) libWebp.PictureImportRGBA.invoke(pictureSegment.address(), copied.address(), 
+                    renderedImage.getWidth() * 3);
+            LOG.info("ok we just did an invoke, result is: " + result);
+            // now we should do an upcall !!!
+            final MethodHandle writerMH =
+                    MethodHandles.lookup().findStatic(WebpImageWriter.class, "myWriter", 
+                            MethodType.methodType(int.class, MemoryAddress.class, int.class, MemoryAddress.class));
+            LOG.info("I have the writeMH");
+            final MemorySegment writerFunctionSegment =
+                    CLinker.getInstance().upcallStub(writerMH, 
+                            FunctionDescriptor.of(C_INT, C_POINTER, C_INT, C_POINTER));
+            picture.setWriter(writerFunctionSegment.address().toRawLongValue());
+            LOG.info("I set the writer, now time for encoding fun!");
+            result = (Integer) libWebp.Encode.invoke(configSegment.address(), pictureSegment.address());
+            LOG.info("Ok, what just happened? " + result);
         } catch(Throwable t) {
             throw new IOException("Oh no!", t);
         }
     }
     
     /** It's static for now so I can try it out */
-    public static int myWriter(MemoryAddress data, int dataSize, Picture picture) {
+    public static int myWriter(MemoryAddress data, int dataSize, MemoryAddress picturePointer) {
         LOG.info("I i need to write: " + dataSize + " bytes!");
         return 1; // write is always successful so far
     }
