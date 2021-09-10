@@ -16,7 +16,9 @@ import java.lang.invoke.MethodHandles;
 import static java.lang.invoke.MethodHandles.insertArguments;
 import java.lang.invoke.MethodType;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
+import java.nio.channels.WritableByteChannel;
 import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
 import javax.imageio.IIOImage;
@@ -98,20 +100,20 @@ public final class WebpImageWriter extends ImageWriter {
             LOG.info("the result is: " + result);
             // now i can import the RGB data
             // PictureImportRGBA(WebPPicture* picture, const uint8_t* rgba, int rgba_stride); 
-            result = (Integer) libWebp.PictureImportRGBA.invoke(pictureSegment.address(), copied.address(), 
+            result = (Integer) libWebp.PictureImportRGB.invoke(pictureSegment.address(), copied.address(), 
                     renderedImage.getWidth() * 3);
             LOG.info("ok we just did an invoke, result is: " + result);
             // now we should do an upcall !!!
             final MethodHandle writerMH =
                     MethodHandles.lookup().findStatic(WebpImageWriter.class, "myWriter", 
                             MethodType.methodType(int.class, 
-                                    OutputStream.class, MemoryAddress.class, int.class, MemoryAddress.class));
+                                    WritableByteChannel.class, MemoryAddress.class, int.class, MemoryAddress.class));
             // let's bind a parameter to this handle!
             final File testFile = new File("/tmp/test-out.webp");
             testFile.delete();
             final OutputStream os = new FileOutputStream(testFile);
-            LOG.info("I have the writeMH");
-            final MethodHandle writerBound = insertArguments(writerMH, 0, os);
+            final WritableByteChannel channel = Channels.newChannel(os);
+            final MethodHandle writerBound = insertArguments(writerMH, 0, channel);
             final MemorySegment writerFunctionSegment =
                     CLinker.getInstance().upcallStub(writerBound, 
                             FunctionDescriptor.of(C_INT, C_POINTER, C_INT, C_POINTER));
@@ -124,13 +126,13 @@ public final class WebpImageWriter extends ImageWriter {
         }
     }
     
-    /** It's static for now so I can try it out */
-    public static int myWriter(OutputStream outputStream, MemoryAddress data, int dataSize, MemoryAddress picturePointer) {
-        LOG.info("I i need to write: " + dataSize + " bytes!");
+    /** This can be static because we can bind any object necessary to the outputChannel
+     parameter */
+    public static int myWriter(WritableByteChannel channel, MemoryAddress data, int dataSize, MemoryAddress picturePointer) {
         final MemorySegment dataSegment = data.asSegmentRestricted(dataSize);
+        final ByteBuffer byteBuffer = dataSegment.asByteBuffer();
         try {
-            // FIXME - this is not efficient because it's copying the segment into bytes on the heap
-            outputStream.write(dataSegment.toByteArray());
+            channel.write(byteBuffer);
         } catch(IOException ioe) {
             LOG.log(WARNING,"caught: ", ioe);
             return 0;
@@ -144,6 +146,7 @@ public final class WebpImageWriter extends ImageWriter {
         // regular JPEGs read in by ImageIO don't have rasters
         
         final RenderedImage renderedImage = image.getRenderedImage();
+        LOG.info("the sample model is: " + renderedImage.getSampleModel());
         if(true) {
             writeAdvanced(renderedImage);
             return;
