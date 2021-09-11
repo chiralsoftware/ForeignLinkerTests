@@ -2,7 +2,9 @@ package chiralsoftware.linkerwebp.impl;
 
 import chiralsoftware.linkerwebp.Config;
 import chiralsoftware.linkerwebp.Picture;
+import chiralsoftware.linkerwebp.WebpUtils;
 import chiralsoftware.linkerwebp.WebpWriterSpi;
+import java.awt.image.ComponentSampleModel;
 import java.awt.image.DataBuffer;
 import java.awt.image.DataBufferByte;
 import java.awt.image.Raster;
@@ -17,10 +19,11 @@ import static java.lang.invoke.MethodHandles.insertArguments;
 import java.lang.invoke.MethodType;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
-import java.nio.channels.FileChannel;
 import java.nio.channels.WritableByteChannel;
+import java.util.Arrays;
 import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
+import javax.imageio.IIOException;
 import javax.imageio.IIOImage;
 import javax.imageio.ImageTypeSpecifier;
 import javax.imageio.ImageWriteParam;
@@ -30,7 +33,6 @@ import jdk.incubator.foreign.CLinker;
 import static jdk.incubator.foreign.CLinker.C_INT;
 import static jdk.incubator.foreign.CLinker.C_POINTER;
 import jdk.incubator.foreign.FunctionDescriptor;
-import jdk.incubator.foreign.MemoryAccess;
 import jdk.incubator.foreign.MemoryAddress;
 import jdk.incubator.foreign.MemorySegment;
 import static jdk.incubator.foreign.MemorySegment.allocateNative;
@@ -69,7 +71,19 @@ public final class WebpImageWriter extends ImageWriter {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
     
-    public void writeAdvanced(RenderedImage renderedImage) throws IOException {
+    public void write(IIOMetadata streamMetadata, IIOImage image, ImageWriteParam param) throws IOException {
+        final RenderedImage renderedImage = image.getRenderedImage();
+        LOG.info("the sample model is: " + renderedImage.getSampleModel() + 
+                ", which is class: " + renderedImage.getSampleModel().getClass());
+        if(! (renderedImage.getSampleModel() instanceof ComponentSampleModel)) {
+            throw new IIOException("sample model was of type: " + renderedImage.getSampleModel().getClass() + 
+                    ", but this writer can only support type: " + ComponentSampleModel.class);
+        }
+        final ComponentSampleModel sampleModel = (ComponentSampleModel) renderedImage.getSampleModel();
+        LOG.info("Band offsets: " + Arrays.toString(sampleModel.getBandOffsets()));
+        LOG.info("The colormodel is: " + renderedImage.getColorModel() + " which is class: " + 
+                renderedImage.getColorModel() + " and color space type: " + 
+                WebpUtils.colorSpaceType(renderedImage.getColorModel().getColorSpace().getType()));
         final Raster raster = renderedImage.getData();
         final DataBuffer dataBuffer = raster.getDataBuffer();
         final DataBufferByte dataBufferByte = (DataBufferByte) dataBuffer;
@@ -133,71 +147,13 @@ public final class WebpImageWriter extends ImageWriter {
         final ByteBuffer byteBuffer = dataSegment.asByteBuffer();
         try {
             channel.write(byteBuffer);
+            dataSegment.close();
         } catch(IOException ioe) {
             LOG.log(WARNING,"caught: ", ioe);
             return 0;
         }
         return 1; // write is always successful so far
     }
-
-    @Override
-    public void write(IIOMetadata streamMetadata, IIOImage image, ImageWriteParam param) throws IOException {
-        LOG.info("Ok let's write this image!");
-        // regular JPEGs read in by ImageIO don't have rasters
-        
-        final RenderedImage renderedImage = image.getRenderedImage();
-        LOG.info("the sample model is: " + renderedImage.getSampleModel());
-        if(true) {
-            writeAdvanced(renderedImage);
-            return;
-        }
-        
-//        if(! image.hasRaster()) throw new IOException("the input image has no raster.");
-        
-        final Raster raster = renderedImage.getData();
-        
-        LOG.info("I got a raster like this: " + raster.getClass().getName());
-        final DataBuffer dataBuffer = raster.getDataBuffer();
-        LOG.info("the data buffer is this: "+ dataBuffer.getClass());
-        final DataBufferByte dataBufferByte = (DataBufferByte) dataBuffer;
-        LOG.info("it has this many banks: " + dataBufferByte.getNumBanks());
-        final byte[] bytes = dataBufferByte.getData();
-        LOG.info("it has this many bytes: "+ bytes.length);
-        // let's copy the bytes into a native segment
-        MemorySegment copied = MemorySegment.allocateNative(bytes.length);
-        copied.asByteBuffer().put(bytes);
-        // there are three bytes per pixel in this, so write it out
-        // i should use: 
-        // size_t WebPEncodeLosslessRGB(const uint8_t* rgb, int width, int height, int stride, uint8_t** output);
-        final MemorySegment outputPointer = MemorySegment.allocateNative(8); // 64 bit pointers are 8 bytes
-        final MemorySegment inputBytes = MemorySegment.ofArray(bytes);
-        long size;
-        try {
-            size = (Long) libWebp.EncodeLosslessRGB.invoke(copied.address(), 
-                    renderedImage.getWidth(), renderedImage.getHeight(),
-                renderedImage.getWidth() * 3, outputPointer.address());
-            LOG.info("the alleged size is: " + size);
-        } catch(Throwable t) {
-            throw new IOException("Oh no!", t);
-        }
-        final long imagePointer = MemoryAccess.getLong(outputPointer);
-        final MemoryAddress pointerAddress = MemoryAddress.ofLong(imagePointer);
-        final MemorySegment imageSegment = pointerAddress.asSegmentRestricted(size);
-        // we need to get a MemoryAddress for the rgb, and then pass all this to Encode
-        LOG.info("done with getting the image pointer, now let's write to a file");
-        final ByteBuffer outputBytes = imageSegment.asByteBuffer();
-        final FileChannel fc = new FileOutputStream("/tmp/myimage.webp").getChannel();
-        fc.write(outputBytes);
-        fc.close();
-        LOG.info("ok it is saved!!");
-        LOG.info("try to do a WebpFree");
-        try {
-            libWebp.Free.invoke(pointerAddress);
-        } catch(Throwable t) {
-            throw new IOException("couldn't free", t);
-        }
-        LOG.info("it's free!");
-  }
     
     @Override
     public void setOutput(Object object) {

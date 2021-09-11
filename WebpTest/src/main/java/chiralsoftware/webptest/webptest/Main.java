@@ -23,20 +23,10 @@ public class Main {
 
     private static final Logger LOG = Logger.getLogger(Main.class.getName());
     
-    public static void main(String[] args) throws Throwable {
-        LOG.info("Testing this out!");
-        
-//        final WebpReaderSpi spi = new WebpReaderSpi();
-//        
-//        LOG.info("info: " + spi.getDescription(Locale.getDefault()));
-        
+    private static void readTest() throws Throwable {
         final byte[] bytes = Files.readAllBytes(Path.of("/tmp/test.webp"));
-
         final Iterator<ImageReader> readers = ImageIO.getImageReaders(bytes);
-        
         final ImageReader myReader = readers.next();
-        
-        
         myReader.setInput(bytes,false);
         final BufferedImage result = myReader.read(0);
         LOG.info("I got this result: " + result);
@@ -46,7 +36,10 @@ public class Main {
         LOG.info("The ImageTypeSpecifier is: " + imageTypeSpecifier);
         LOG.info("ImageTypeSpecifier num of bands= " + imageTypeSpecifier.getNumBands());
         LOG.info("ImageTypeSpecifier num of components= " + imageTypeSpecifier.getNumComponents());
-        ImageIO.write(result, "PNG", new File("/tmp/output.png"));
+    } 
+    
+    public static void main(String[] args) throws Throwable {
+        LOG.info("Testing this out!");
         
         LOG.info("and now for the next thing: write a WEBP!");
         
