@@ -6,6 +6,9 @@ import java.awt.image.BufferedImage;
 import java.awt.image.ColorModel;
 import java.awt.image.ComponentColorModel;
 import java.awt.image.ComponentSampleModel;
+import java.awt.image.DataBuffer;
+import java.awt.image.DataBufferByte;
+import java.awt.image.Raster;
 import java.awt.image.SampleModel;
 import java.io.File;
 import static java.lang.System.out;
@@ -33,6 +36,7 @@ public class ImageAnalyzer {
         final ColorModel colorModel = bim.getColorModel();
         out.println("Color model: " + colorModel);
         out.println(" which is an instance of: " + colorModel.getClass());
+        if(colorModel.hasAlpha()) out.println("has alpha");
         if(colorModel instanceof ComponentColorModel) {
             final ComponentColorModel ccm = (ComponentColorModel) colorModel;
             out.println("It is a ComponentColorModel");
@@ -50,6 +54,20 @@ public class ImageAnalyzer {
             out.println(" and band offsets: " + Arrays.toString(csm.getBandOffsets()));
         }
         out.println("");
+        final Raster raster = bim.getData();
+        final DataBuffer dataBuffer = raster.getDataBuffer();
+        out.println("DataBuffer: " + dataBuffer + " is of class: " + dataBuffer.getClass());
+        out.println("  the dataBuffer has: "  + dataBuffer.getNumBanks() + " banks");
+        // this should always be of DataBufferByte
+        if(! (dataBuffer instanceof DataBufferByte)) {
+            out.println("The dataBuffer is not of type : " + DataBufferByte.class);
+            return;
+        }
+        final DataBufferByte dataBufferByte = (DataBufferByte) dataBuffer;
+        out.println("The size of the data buffer is: " + dataBufferByte.getData().length);
+        out.println("the number of pixels in the image is: " + (bim.getWidth() * bim.getHeight()));
+        out.println("number of pixels * 4 = " + (bim.getWidth() * bim.getHeight() * 4));
+        out.println("number of pixels * 3 = " + (bim.getWidth() * bim.getHeight() * 3));
     }
     
 }

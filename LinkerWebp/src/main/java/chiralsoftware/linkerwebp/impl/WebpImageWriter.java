@@ -2,13 +2,17 @@ package chiralsoftware.linkerwebp.impl;
 
 import chiralsoftware.linkerwebp.Config;
 import chiralsoftware.linkerwebp.Picture;
-import chiralsoftware.linkerwebp.WebpUtils;
+import static chiralsoftware.linkerwebp.WebpUtils.colorSpaceType;
 import chiralsoftware.linkerwebp.WebpWriterSpi;
+import static java.awt.color.ColorSpace.TYPE_RGB;
+import java.awt.image.ColorModel;
+import java.awt.image.ComponentColorModel;
 import java.awt.image.ComponentSampleModel;
 import java.awt.image.DataBuffer;
 import java.awt.image.DataBufferByte;
 import java.awt.image.Raster;
 import java.awt.image.RenderedImage;
+import java.awt.image.SampleModel;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -80,42 +84,82 @@ public final class WebpImageWriter extends ImageWriter {
                     ", but this writer can only support type: " + ComponentSampleModel.class);
         }
         final ComponentSampleModel sampleModel = (ComponentSampleModel) renderedImage.getSampleModel();
-        LOG.info("Band offsets: " + Arrays.toString(sampleModel.getBandOffsets()));
-        LOG.info("The colormodel is: " + renderedImage.getColorModel() + " which is class: " + 
-                renderedImage.getColorModel() + " and color space type: " + 
-                WebpUtils.colorSpaceType(renderedImage.getColorModel().getColorSpace().getType()));
+        if(sampleModel.getNumBands() > 4 || sampleModel.getNumBands() < 3) 
+            throw new IIOException("sampleModel.getNumBands() must be 3 or 4; it was: " +
+                    sampleModel.getNumBands());
+        LOG.finest("Band offsets: " + Arrays.toString(sampleModel.getBandOffsets()));
+
+        final ColorModel colorModel = renderedImage.getColorModel();
+        final boolean hasAlpha = colorModel.hasAlpha();
+        if(hasAlpha && sampleModel.getNumBands() != 4) 
+            throw new IIOException("the colorModel has alpha, but the number of bands is: " +
+                    sampleModel.getNumBands() + ". it should be 4");
+        if(! (colorModel instanceof ComponentColorModel)) 
+            throw new IIOException("This writer expects a ComponentColorModel");
+        
+        LOG.finest("The colormodel is: " + colorModel + " which is class: " + 
+                colorModel.getClass() + " and color space type: " + 
+                colorSpaceType(colorModel.getColorSpace().getType()));
+        if(renderedImage.getColorModel().getColorSpace().getType() != TYPE_RGB) {
+            final int intType = renderedImage.getColorModel().getColorSpace().getType();
+            throw new IIOException("The color type was: " + intType + " (" + colorSpaceType(intType) + 
+                    "), but this writer only processes " + colorSpaceType(TYPE_RGB));
+        }
+        
         final Raster raster = renderedImage.getData();
         final DataBuffer dataBuffer = raster.getDataBuffer();
         final DataBufferByte dataBufferByte = (DataBufferByte) dataBuffer;
-        LOG.info("it has this many banks: " + dataBufferByte.getNumBanks());
+        LOG.finer("it has this many banks: " + dataBufferByte.getNumBanks());
+        if(dataBufferByte.getNumBanks() != 1) 
+            throw new IIOException("the dataBuffer contained: " + dataBufferByte.getNumBanks() + 
+                    " banks, but this writer expects 1 bank");
+        
         final byte[] bytes = dataBufferByte.getData();
-        LOG.info("it has this many bytes: "+ bytes.length);
         // let's copy the bytes into a native segment
+        LOG.warning("we're copying byte arrays - fix this so we don't need to do that");
         MemorySegment copied = MemorySegment.allocateNative(bytes.length);
         copied.asByteBuffer().put(bytes);
         final MemorySegment configSegment = 
                 allocateNative(Config.Config);
         try {
             int result = (Integer) libWebp.ConfigInit.invoke(configSegment.address());
-            LOG.info("cool i just called config. result=" + result);
+            if(result != 1) 
+                throw new IIOException("couldn't initialize the config segment: " + result);
             final Config myConfig = new Config(configSegment);
-            LOG.info("here is the config string: " + myConfig);
-            MemorySegment pictureSegment =
+            LOG.fine("here is the config string: " + myConfig);
+            final MemorySegment pictureSegment =
                     allocateNative(Picture.Picture);
             result = (Integer) libWebp.PictureInit.invoke(pictureSegment.address());
-            LOG.info("Ok i init the picture, result is: "+ result);
+            if(result != 1) 
+                throw new IIOException("couldn't initialize Picture object: " +result);
+            
             final Picture picture = new Picture(pictureSegment);
             libWebp.PictureInit.invoke(pictureSegment.address());
-            LOG.info("now set the relevant fields in the picture");
-            picture.setUseArgb(0);
+            picture.setUseArgb(renderedImage.getColorModel().hasAlpha() ? 1 : 0);
             picture.setWidth(renderedImage.getWidth());
             picture.setHeight(renderedImage.getHeight());
             result = (Integer) libWebp.PictureAlloc.invoke(pictureSegment.address());
-            LOG.info("the result is: " + result);
-            // now i can import the RGB data
-            // PictureImportRGBA(WebPPicture* picture, const uint8_t* rgba, int rgba_stride); 
-            result = (Integer) libWebp.PictureImportRGB.invoke(pictureSegment.address(), copied.address(), 
-                    renderedImage.getWidth() * 3);
+            if(result != 1)
+                throw new IIOException("picture alloc failed!");
+            // which way we import data depends:
+            // does it have alpha or not
+            // three or four bands
+            // RGB or BGR
+            final MethodHandle importer =
+                    switch(ImportType.findType(sampleModel.getBandOffsets(), hasAlpha)) {
+                        case ABGR -> libWebp.PictureImportBGRA;
+                        case BGR -> libWebp.PictureImportBGR;
+                        case BGRX -> libWebp.PictureImportBGRX;
+                        case RGB -> libWebp.PictureImportRGB;
+                        case RGBA -> libWebp.PictureImportRGBA;
+                        case RGBX -> libWebp.PictureImportRGBX;
+                        default -> null;
+                    };
+            if(importer == null)
+                throw new IIOException("couldn't find an importer for band offsets: " +  
+                        Arrays.toString(sampleModel.getBandOffsets()) + " and alpha: "+ hasAlpha);
+            result = (Integer) importer.invoke(pictureSegment.address(), copied.address(), 
+                    renderedImage.getWidth() * sampleModel.getNumBands());
             LOG.info("ok we just did an invoke, result is: " + result);
             // now we should do an upcall !!!
             final MethodHandle writerMH =

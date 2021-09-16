@@ -190,6 +190,22 @@ public final class LibWebp {
                 MethodType.methodType(int.class, MemoryAddress.class, MemoryAddress.class, int.class),
                 FunctionDescriptor.of(C_INT, C_POINTER, C_POINTER, C_INT));
         
+        PictureImportRGBX = loadMethodHandle(cLinker, libraryLookup, "WebPPictureImportRGBX",
+                MethodType.methodType(int.class, MemoryAddress.class, MemoryAddress.class, int.class),
+                FunctionDescriptor.of(C_INT, C_POINTER, C_POINTER, C_INT));
+        
+        PictureImportBGR = loadMethodHandle(cLinker, libraryLookup, "WebPPictureImportBGR",
+                MethodType.methodType(int.class, MemoryAddress.class, MemoryAddress.class, int.class),
+                FunctionDescriptor.of(C_INT, C_POINTER, C_POINTER, C_INT));
+        
+        PictureImportBGRA = loadMethodHandle(cLinker, libraryLookup, "WebPPictureImportBGRA",
+                MethodType.methodType(int.class, MemoryAddress.class, MemoryAddress.class, int.class),
+                FunctionDescriptor.of(C_INT, C_POINTER, C_POINTER, C_INT));
+
+        PictureImportBGRX = loadMethodHandle(cLinker, libraryLookup, "WebPPictureImportBGRX",
+                MethodType.methodType(int.class, MemoryAddress.class, MemoryAddress.class, int.class),
+                FunctionDescriptor.of(C_INT, C_POINTER, C_POINTER, C_INT));
+        
 //        int WebPEncode(const WebPConfig* config, WebPPicture* picture)
         Encode = loadMethodHandle(cLinker, libraryLookup, "WebPEncode", 
                 MethodType.methodType(int.class, MemoryAddress.class, MemoryAddress.class),
@@ -271,6 +287,25 @@ public final class LibWebp {
     
     /** int WebPPictureImportRGBA(WebPPicture* picture, const uint8_t* rgba, int rgba_stride); */
     public final MethodHandle PictureImportRGBA;
+    
+    /**  Same, but for RGBA buffer. Imports the RGB direct from the 32-bit format
+     * input buffer ignoring the alpha channel. Avoids needing to copy the data
+     * to a temporary 24-bit RGB buffer to import the RGB only.
+<pre>WEBP_EXTERN int WebPPictureImportRGBX(
+    WebPPicture* picture, const uint8_t* rgbx, int rgbx_stride);</pre> */
+    public final MethodHandle PictureImportRGBX;
+
+    /** Variants of the above, but taking BGR(A|X) input. 
+     * <pre>WEBP_EXTERN int WebPPictureImportBGR(
+    WebPPicture* picture, const uint8_t* bgr, int bgr_stride);
+WEBP_EXTERN int WebPPictureImportBGRA(
+    WebPPicture* picture, const uint8_t* bgra, int bgra_stride);
+WEBP_EXTERN int WebPPictureImportBGRX(
+    WebPPicture* picture, const uint8_t* bgrx, int bgrx_stride);</pre>
+     */
+    public final MethodHandle PictureImportBGR;
+    public final MethodHandle PictureImportBGRA;
+    public final MethodHandle PictureImportBGRX;
     
     /** Main encoding call, after config and picture have been initialized.
      * 'picture' must be less than 16384x16384 in dimension (cf WEBP_MAX_DIMENSION),
