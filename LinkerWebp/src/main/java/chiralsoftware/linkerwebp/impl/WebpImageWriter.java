@@ -12,7 +12,6 @@ import java.awt.image.DataBuffer;
 import java.awt.image.DataBufferByte;
 import java.awt.image.Raster;
 import java.awt.image.RenderedImage;
-import java.awt.image.SampleModel;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -40,6 +39,7 @@ import jdk.incubator.foreign.FunctionDescriptor;
 import jdk.incubator.foreign.MemoryAddress;
 import jdk.incubator.foreign.MemorySegment;
 import static jdk.incubator.foreign.MemorySegment.allocateNative;
+import static jdk.incubator.foreign.ResourceScope.newImplicitScope;
 
 /**
  * Write a BufferedImage to a webp format
@@ -74,7 +74,8 @@ public final class WebpImageWriter extends ImageWriter {
     public IIOMetadata convertImageMetadata(IIOMetadata inData, ImageTypeSpecifier imageType, ImageWriteParam param) {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
-    
+
+    /** We are ignoring the ImageWriterParam for now */    
     public void write(IIOMetadata streamMetadata, IIOImage image, ImageWriteParam param) throws IOException {
         final RenderedImage renderedImage = image.getRenderedImage();
         LOG.info("the sample model is: " + renderedImage.getSampleModel() + 
@@ -117,10 +118,10 @@ public final class WebpImageWriter extends ImageWriter {
         final byte[] bytes = dataBufferByte.getData();
         // let's copy the bytes into a native segment
         LOG.warning("we're copying byte arrays - fix this so we don't need to do that");
-        MemorySegment copied = MemorySegment.allocateNative(bytes.length);
+        MemorySegment copied = MemorySegment.allocateNative(bytes.length, newImplicitScope());
         copied.asByteBuffer().put(bytes);
         final MemorySegment configSegment = 
-                allocateNative(Config.Config);
+                allocateNative(Config.Config, newImplicitScope());
         try {
             int result = (Integer) libWebp.ConfigInit.invoke(configSegment.address());
             if(result != 1) 
@@ -128,7 +129,8 @@ public final class WebpImageWriter extends ImageWriter {
             final Config myConfig = new Config(configSegment);
             LOG.fine("here is the config string: " + myConfig);
             final MemorySegment pictureSegment =
-                    allocateNative(Picture.Picture);
+                    // implicit scope will be handled by the GC
+                    allocateNative(Picture.Picture, newImplicitScope());
             result = (Integer) libWebp.PictureInit.invoke(pictureSegment.address());
             if(result != 1) 
                 throw new IIOException("couldn't initialize Picture object: " +result);
@@ -172,10 +174,10 @@ public final class WebpImageWriter extends ImageWriter {
             final OutputStream os = new FileOutputStream(testFile);
             final WritableByteChannel channel = Channels.newChannel(os);
             final MethodHandle writerBound = insertArguments(writerMH, 0, channel);
-            final MemorySegment writerFunctionSegment =
+            final MemoryAddress writerFunctionAddress =
                     CLinker.getInstance().upcallStub(writerBound, 
-                            FunctionDescriptor.of(C_INT, C_POINTER, C_INT, C_POINTER));
-            picture.setWriter(writerFunctionSegment.address().toRawLongValue());
+                            FunctionDescriptor.of(C_INT, C_POINTER, C_INT, C_POINTER), newImplicitScope());
+            picture.setWriter(writerFunctionAddress.toRawLongValue());
             LOG.info("I set the writer, now time for encoding fun!");
             result = (Integer) libWebp.Encode.invoke(configSegment.address(), pictureSegment.address());
             LOG.info("Ok, what just happened? " + result);
@@ -187,11 +189,10 @@ public final class WebpImageWriter extends ImageWriter {
     /** This can be static because we can bind any object necessary to the outputChannel
      parameter */
     public static int myWriter(WritableByteChannel channel, MemoryAddress data, int dataSize, MemoryAddress picturePointer) {
-        final MemorySegment dataSegment = data.asSegmentRestricted(dataSize);
+        final MemorySegment dataSegment = data.asSegment(dataSize, newImplicitScope());
         final ByteBuffer byteBuffer = dataSegment.asByteBuffer();
         try {
             channel.write(byteBuffer);
-            dataSegment.close();
         } catch(IOException ioe) {
             LOG.log(WARNING,"caught: ", ioe);
             return 0;

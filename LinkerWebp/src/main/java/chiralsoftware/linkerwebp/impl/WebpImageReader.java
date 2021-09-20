@@ -6,9 +6,7 @@ import java.awt.image.DataBuffer;
 import java.awt.image.DataBufferByte;
 import java.awt.image.WritableRaster;
 import java.io.IOException;
-import java.lang.invoke.VarHandle;
 import java.nio.ByteBuffer;
-import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import java.util.Iterator;
 import java.util.List;
 import static java.util.logging.Level.WARNING;
@@ -18,9 +16,13 @@ import javax.imageio.ImageReader;
 import javax.imageio.ImageTypeSpecifier;
 import javax.imageio.metadata.IIOMetadata;
 import javax.imageio.spi.ImageReaderSpi;
-import jdk.incubator.foreign.MemoryHandles;
+import static jdk.incubator.foreign.CLinker.C_INT;
+import jdk.incubator.foreign.MemoryAccess;
+import static jdk.incubator.foreign.MemoryHandles.varHandle;
+import jdk.incubator.foreign.MemoryLayout;
 import jdk.incubator.foreign.MemorySegment;
 import static jdk.incubator.foreign.MemorySegment.allocateNative;
+import static jdk.incubator.foreign.ResourceScope.newImplicitScope;
 
 /**
  * Read a Webp image
@@ -41,7 +43,7 @@ public final class WebpImageReader extends ImageReader {
     public void dispose() {
         super.dispose();
         LOG.fine("disposing resources of this reader");
-        if(inputSegment != null && inputSegment.isAlive()) inputSegment.close();
+//        if(inputSegment != null && inputSegment.isAlive()) inputSegment.close();
         inputSegment = null;
         width = height = -1;
     }
@@ -99,11 +101,12 @@ public final class WebpImageReader extends ImageReader {
     /** Read in the image header to get image info */
     private void readHeader() {
         if(inputSegment == null) throw new NullPointerException("can't read the header of null input");
-        if(! inputSegment.isAlive()) throw new IllegalStateException("this image has already been disposed");
+//        if(! inputSegment.isAlive()) throw new IllegalStateException("this image has already been disposed");
 
-        final MemorySegment sizeSegment = allocateNative(4 * 2);
+        final MemorySegment sizeSegment = 
+                allocateNative(MemoryLayout.structLayout(C_INT.withName("width"), 
+                        C_INT.withName("height")), newImplicitScope());
         
-        final VarHandle varHandle = MemoryHandles.varHandle(int.class, LITTLE_ENDIAN);
         try {
             // WebPGetInfo(const uint8_t* data, size_t data_size, int* width, int* height)
             libWebp.GetInfo.invoke(inputSegment.address(), (long) inputSegment.byteSize(), sizeSegment.address(), 
@@ -113,10 +116,9 @@ public final class WebpImageReader extends ImageReader {
         }
 
         // we could simplify this by using: MemoryAccess.getIntAt(..)
-        width = (Integer) varHandle.get(sizeSegment,0);
-        height = (Integer) varHandle.get(sizeSegment,4);
+        width = MemoryAccess.getIntAtOffset(sizeSegment, 0);
+        height = MemoryAccess.getIntAtOffset(sizeSegment, 4);
 
-        sizeSegment.close();
     }
 
     @Override
@@ -127,11 +129,9 @@ public final class WebpImageReader extends ImageReader {
         
         if(inputSegment == null) 
             throw new NullPointerException("Input stream was null!");
-        if(! inputSegment.isAlive()) 
-            throw new IllegalStateException("the input segment isn't alive");
         readHeader();
         LOG.info("Ok i read the header; size is: " + width  + ", " + height);
-        final MemorySegment outputSegment = MemorySegment.allocateNative(width * height * 4);
+        final MemorySegment outputSegment = MemorySegment.allocateNative(width * height * 4, newImplicitScope());
         
         // uint8_t* WebPDecodeARGBInto(const uint8_t* data, size_t data_size,
         //                    uint8_t* output_buffer, int output_buffer_size, int output_stride);
@@ -160,7 +160,6 @@ public final class WebpImageReader extends ImageReader {
             bank1[i * 4 + 2] = outputByteArray[i * 4 + 2]; // G
             bank1[i * 4 + 3] = outputByteArray[i * 4 + 1]; // R
         }
-        outputSegment.close();
         return bufferedImage;
     }
 
@@ -172,7 +171,7 @@ public final class WebpImageReader extends ImageReader {
             throw new IllegalStateException("call dispose() first!");
         
         if (input instanceof byte[] ba) {
-            inputSegment = MemorySegment.allocateNative(ba.length);
+            inputSegment = MemorySegment.allocateNative(ba.length, newImplicitScope());
 
             // fixme - we shouldn't have to copy bytes
             final ByteBuffer bb = inputSegment.asByteBuffer();

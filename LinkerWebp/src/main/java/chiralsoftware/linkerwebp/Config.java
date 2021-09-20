@@ -3,12 +3,11 @@ package chiralsoftware.linkerwebp;
 import chiralsoftware.linkerwebp.impl.LibWebp.ImageHint;
 import static java.lang.System.lineSeparator;
 import java.lang.invoke.VarHandle;
-import static java.nio.ByteOrder.nativeOrder;
+import static jdk.incubator.foreign.CLinker.C_INT;
 import jdk.incubator.foreign.GroupLayout;
-import jdk.incubator.foreign.MemoryLayout;
 import static jdk.incubator.foreign.MemoryLayout.PathElement.groupElement;
-import static jdk.incubator.foreign.MemoryLayout.ofPaddingBits;
-import static jdk.incubator.foreign.MemoryLayout.ofValueBits;
+import static jdk.incubator.foreign.MemoryLayout.paddingLayout;
+import static jdk.incubator.foreign.MemoryLayout.structLayout;
 import jdk.incubator.foreign.MemorySegment;
 
 /**
@@ -29,71 +28,70 @@ public final class Config {
     /**
      * Match the struct WebPConfig definition
      */
-    public static final GroupLayout Config
-            = MemoryLayout.ofStruct(
+    public static final GroupLayout Config = structLayout(
                     // Lossless encoding (0=lossy(default), 1=lossless).
-                    ofValueBits(32, nativeOrder()).withName("lossless"),
+                    C_INT.withName("lossless"),
                     // between 0 and 100. For lossy, 0 gives the smallest
                     // size and 100 the largest. For lossless, this
                     // parameter is the amount of effort put into the
                     // compression: 0 is the fastest but gives larger
                     // files compared to the slowest, but best, 100.
-                    ofValueBits(32, nativeOrder()).withName("quality"),
+                    C_INT.withName("quality"),
                     // quality/speed trade-off (0=fast, 6=slower-better)
-                    ofValueBits(32, nativeOrder()).withName("method"),
+                    C_INT.withName("method"),
                     // Hint for image type (lossless only for now).
                     // this is represented as an int i think?
-                    ofValueBits(32, nativeOrder()).withName("image_hint"),
+                    C_INT.withName("image_hint"),
                     // Parameters related to lossy compression only:
                     // if non-zero, set the desired target size in bytes.
                     // Takes precedence over the 'compression' parameter.
-                    ofValueBits(32, nativeOrder()).withName("target_size"),
+                    C_INT.withName("target_size"),
                     // if non-zero, specifies the minimal distortion to
                     // try to achieve. Takes precedence over target_size.
-                    ofValueBits(32, nativeOrder()).withName("target_PSNR"),
+                    C_INT.withName("target_PSNR"),
                     // maximum number of segments to use, in [1..4]
-                    ofValueBits(32, nativeOrder()).withName("segments"),
+                    C_INT.withName("segments"),
                     // Spatial Noise Shaping. 0=off, 100=maximum.
-                    ofValueBits(32, nativeOrder()).withName("sns_strength"),
+                    C_INT.withName("sns_strength"),
                     // range: [0 = off .. 100 = strongest]
-                    ofValueBits(32, nativeOrder()).withName("filter_strength"),
+                    C_INT.withName("filter_strength"),
                     // range: [0 = off .. 7 = least sharp]
-                    ofValueBits(32, nativeOrder()).withName("filter_sharpness"),
+                    C_INT.withName("filter_sharpness"),
                     // filtering type: 0 = simple, 1 = strong (only used
                     // if filter_strength > 0 or autofilter > 0)
-                    ofValueBits(32, nativeOrder()).withName("filter_type"),
+                    C_INT.withName("filter_type"),
                     // Auto adjust filter's strength [0 = off, 1 = on]
-                    ofValueBits(32, nativeOrder()).withName("autofilter"),
+                    C_INT.withName("autofilter"),
                     // Algorithm for encoding the alpha plane (0 = none,
                     // 1 = compressed with WebP lossless). Default is 1
-                    ofValueBits(32, nativeOrder()).withName("alpha_compression"),
+                    C_INT.withName("alpha_compression"),
                     // Predictive filtering method for alpha plane.
                     //  0: none, 1: fast, 2: best. Default if 1.
-                    ofValueBits(32, nativeOrder()).withName("alpha_filtering"),
+                    C_INT.withName("alpha_filtering"),
                     // Between 0 (smallest size) and 100 (lossless).
                     // Default is 100.
-                    ofValueBits(32, nativeOrder()).withName("alpha_quality"),
+                    C_INT.withName("alpha_quality"),
                     // number of entropy-analysis passes (in [1..10]).
-                    ofValueBits(32, nativeOrder()).withName("pass"),
+                    C_INT.withName("pass"),
                     // if true, export the compressed picture back.
                     // In-loop filtering is not applied.
-                    ofValueBits(32, nativeOrder()).withName("show_compressed"),
+                    C_INT.withName("show_compressed"),
                     // preprocessing filter (0=none, 1=segment-smooth)
-                    ofValueBits(32, nativeOrder()).withName("preprocessing"),
+                    C_INT.withName("preprocessing"),
                     // log2(number of token partitions) in [0..3]
                     // Default is set to 0 for easier progressive decoding.
-                    ofValueBits(32, nativeOrder()).withName("partitions"),
+                    C_INT.withName("partitions"),
                     // quality degradation allowed to fit the 512k limit on
                     // prediction modes coding (0: no degradation,
-                    ofValueBits(32, nativeOrder()).withName("partition_limit"),
-                    ofValueBits(32, nativeOrder()).withName("emulate_jpeg_size"),
-                    ofValueBits(32, nativeOrder()).withName("thread_level"),
-                    ofValueBits(32, nativeOrder()).withName("low_memory"),
-                    ofValueBits(32, nativeOrder()).withName("near_lossless"),
-                    ofValueBits(32, nativeOrder()).withName("exact"),
-                    ofValueBits(32, nativeOrder()).withName("use_delta_palette"),
-                    ofValueBits(32, nativeOrder()).withName("use_sharp_yuv"),
-                    ofPaddingBits(64) // padding for later use
+                    C_INT.withName("partition_limit"),
+                    C_INT.withName("emulate_jpeg_size"),
+                    C_INT.withName("thread_level"),
+                    C_INT.withName("low_memory"),
+                    C_INT.withName("near_lossless"),
+                    C_INT.withName("exact"),
+                    C_INT.withName("use_delta_palette"),
+                    C_INT.withName("use_sharp_yuv"),
+                    paddingLayout(64) // padding for later use
             ).withBitAlignment(64);
 
     private final MemorySegment segment;
@@ -293,7 +291,6 @@ public final class Config {
      @return  null if the segment is null */
     public static String showConfig(MemorySegment segment) {
         if(segment == null) return null;
-        if(! segment.isAlive()) return "segment not alive";
         if(segment.byteSize() != Config.byteSize())
             return "segment byte size: " + segment.byteSize() + " does not equal Picture byte size: " + 
                     Config.byteSize();

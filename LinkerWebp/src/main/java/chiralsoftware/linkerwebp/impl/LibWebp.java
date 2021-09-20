@@ -2,11 +2,8 @@ package chiralsoftware.linkerwebp.impl;
 
 import java.io.IOException;
 import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
 import static java.lang.invoke.MethodHandles.insertArguments;
 import java.lang.invoke.MethodType;
-import java.nio.ByteOrder;
-import static java.nio.ByteOrder.nativeOrder;
 import java.nio.file.Path;
 import java.util.Optional;
 import static java.util.logging.Level.WARNING;
@@ -17,12 +14,8 @@ import static jdk.incubator.foreign.CLinker.C_INT;
 import static jdk.incubator.foreign.CLinker.C_LONG;
 import static jdk.incubator.foreign.CLinker.C_POINTER;
 import jdk.incubator.foreign.FunctionDescriptor;
-import jdk.incubator.foreign.GroupLayout;
-import jdk.incubator.foreign.LibraryLookup;
+import jdk.incubator.foreign.SymbolLookup;
 import jdk.incubator.foreign.MemoryAddress;
-import jdk.incubator.foreign.MemoryLayout;
-import static jdk.incubator.foreign.MemoryLayout.ofPaddingBits;
-import static jdk.incubator.foreign.MemoryLayout.ofValueBits;
 
 /**
  * Interface to LibWebp. Note: there will be some changes with JDK 17. See:
@@ -34,8 +27,9 @@ public final class LibWebp {
     private static final Logger LOG = Logger.getLogger(LibWebp.class.getName());
 
     private static final String libraryPath = "/usr/lib/x86_64-linux-gnu/libwebp.so";
+    private static final String libraryName = "webp";
 
-    private final LibraryLookup libraryLookup;
+    private final SymbolLookup symbolLookup;
 
     private static final LibWebp libWebp;
 
@@ -46,6 +40,7 @@ public final class LibWebp {
 
     static {
         try {
+            System.loadLibrary(libraryName);
             libWebp = new LibWebp();
         } catch (IOException ioe) {
             LOG.log(WARNING, "couldn't load libwebp", ioe);
@@ -113,18 +108,18 @@ public final class LibWebp {
         LOG.info("Initializing the linker!");
         final Path path = Path.of(libraryPath);
 
-        libraryLookup = LibraryLookup.ofPath(path);
+        symbolLookup = SymbolLookup.loaderLookup();
 
         final CLinker cLinker = CLinker.getInstance();
 
         // int WebPGetInfo(const uint8_t* data, size_t data_size, int* width, int* height);
-        GetInfo = loadMethodHandle(cLinker, libraryLookup, "WebPGetInfo",
+        GetInfo = loadMethodHandle(cLinker, symbolLookup, "WebPGetInfo",
                 MethodType.methodType(int.class, MemoryAddress.class, long.class, MemoryAddress.class, MemoryAddress.class),
                 FunctionDescriptor.of(CLinker.C_INT, C_POINTER, C_LONG, C_POINTER, C_POINTER));
 
         LOG.info("Cool, here is GetInfo: " + GetInfo);
 
-        DecodeARGBInto = loadMethodHandle(cLinker, libraryLookup, "WebPDecodeARGBInto",
+        DecodeARGBInto = loadMethodHandle(cLinker, symbolLookup, "WebPDecodeARGBInto",
                 MethodType.methodType(MemoryAddress.class, // returns - pointer to output buffer
                         MemoryAddress.class, long.class, // input data and size 
                         MemoryAddress.class, long.class, // output buffer and size
@@ -137,7 +132,7 @@ public final class LibWebp {
         );
 
         // size_t WebPEncodeLosslessRGB(const uint8_t* rgb, int width, int height, int stride, uint8_t** output);
-        EncodeLosslessRGB = loadMethodHandle(cLinker, libraryLookup, "WebPEncodeLosslessRGB",
+        EncodeLosslessRGB = loadMethodHandle(cLinker, symbolLookup, "WebPEncodeLosslessRGB",
                 MethodType.methodType(long.class, // returns - size_t
                         MemoryAddress.class, // buffer with source bytes
                         int.class, int.class, // width and height
@@ -146,7 +141,7 @@ public final class LibWebp {
                 ),
                 FunctionDescriptor.of(C_LONG, C_POINTER, C_INT, C_INT, C_INT, C_POINTER)
         );
-        Free = loadMethodHandle(cLinker, libraryLookup, "WebPFree",
+        Free = loadMethodHandle(cLinker, symbolLookup, "WebPFree",
                 MethodType.methodType(void.class, // returns void
                         MemoryAddress.class // pointer to be freed
                 ),
@@ -155,7 +150,7 @@ public final class LibWebp {
         // annoyingly, the WebPConfigPreset function we would like to access
         // is defined as an inline
         // int WebPConfigInitInternal(WebPConfig*, WebPPreset, float, int);
-        ConfigInitInternal = loadMethodHandle(cLinker, libraryLookup, "WebPConfigInitInternal",
+        ConfigInitInternal = loadMethodHandle(cLinker, symbolLookup, "WebPConfigInitInternal",
                 MethodType.methodType(int.class, // returns false in case of error 
                         MemoryAddress.class, // WebPConfig *
                         int.class, // WebPPreset preset - the enum
@@ -164,7 +159,7 @@ public final class LibWebp {
                 ),
                 FunctionDescriptor.of(C_INT, C_POINTER, C_INT, C_FLOAT, C_INT));
 
-        PictureInitInternal = loadMethodHandle(cLinker, libraryLookup, "WebPPictureInitInternal",
+        PictureInitInternal = loadMethodHandle(cLinker, symbolLookup, "WebPPictureInitInternal",
                 MethodType.methodType(int.class, MemoryAddress.class, // Picture 
                         int.class // WEBP_ENCODER_ABI_VERSION
                 ), FunctionDescriptor.of(C_INT, C_POINTER, C_INT));
@@ -178,47 +173,47 @@ public final class LibWebp {
                 Preset.DEFAULT.ordinal(), 75f, WEBP_ENCODER_ABI_VERSION);
         
 //        int WebPPictureAlloc(WebPPicture* picture)
-        PictureAlloc = loadMethodHandle(cLinker, libraryLookup, "WebPPictureAlloc",
+        PictureAlloc = loadMethodHandle(cLinker, symbolLookup, "WebPPictureAlloc",
                 MethodType.methodType(int.class, MemoryAddress.class),
                 FunctionDescriptor.of(C_INT, C_POINTER));
         
-        PictureImportRGB = loadMethodHandle(cLinker, libraryLookup, "WebPPictureImportRGB",
+        PictureImportRGB = loadMethodHandle(cLinker, symbolLookup, "WebPPictureImportRGB",
                 MethodType.methodType(int.class, MemoryAddress.class, MemoryAddress.class, int.class),
                 FunctionDescriptor.of(C_INT, C_POINTER, C_POINTER, C_INT));
 
-        PictureImportRGBA = loadMethodHandle(cLinker, libraryLookup, "WebPPictureImportRGBA",
+        PictureImportRGBA = loadMethodHandle(cLinker, symbolLookup, "WebPPictureImportRGBA",
                 MethodType.methodType(int.class, MemoryAddress.class, MemoryAddress.class, int.class),
                 FunctionDescriptor.of(C_INT, C_POINTER, C_POINTER, C_INT));
         
-        PictureImportRGBX = loadMethodHandle(cLinker, libraryLookup, "WebPPictureImportRGBX",
+        PictureImportRGBX = loadMethodHandle(cLinker, symbolLookup, "WebPPictureImportRGBX",
                 MethodType.methodType(int.class, MemoryAddress.class, MemoryAddress.class, int.class),
                 FunctionDescriptor.of(C_INT, C_POINTER, C_POINTER, C_INT));
         
-        PictureImportBGR = loadMethodHandle(cLinker, libraryLookup, "WebPPictureImportBGR",
+        PictureImportBGR = loadMethodHandle(cLinker, symbolLookup, "WebPPictureImportBGR",
                 MethodType.methodType(int.class, MemoryAddress.class, MemoryAddress.class, int.class),
                 FunctionDescriptor.of(C_INT, C_POINTER, C_POINTER, C_INT));
         
-        PictureImportBGRA = loadMethodHandle(cLinker, libraryLookup, "WebPPictureImportBGRA",
+        PictureImportBGRA = loadMethodHandle(cLinker, symbolLookup, "WebPPictureImportBGRA",
                 MethodType.methodType(int.class, MemoryAddress.class, MemoryAddress.class, int.class),
                 FunctionDescriptor.of(C_INT, C_POINTER, C_POINTER, C_INT));
 
-        PictureImportBGRX = loadMethodHandle(cLinker, libraryLookup, "WebPPictureImportBGRX",
+        PictureImportBGRX = loadMethodHandle(cLinker, symbolLookup, "WebPPictureImportBGRX",
                 MethodType.methodType(int.class, MemoryAddress.class, MemoryAddress.class, int.class),
                 FunctionDescriptor.of(C_INT, C_POINTER, C_POINTER, C_INT));
         
 //        int WebPEncode(const WebPConfig* config, WebPPicture* picture)
-        Encode = loadMethodHandle(cLinker, libraryLookup, "WebPEncode", 
+        Encode = loadMethodHandle(cLinker, symbolLookup, "WebPEncode", 
                 MethodType.methodType(int.class, MemoryAddress.class, MemoryAddress.class),
                 FunctionDescriptor.of(C_INT, C_POINTER, C_POINTER));
         
     }
 
-    private MethodHandle loadMethodHandle(CLinker cLinker, LibraryLookup libraryLookup,
+    private MethodHandle loadMethodHandle(CLinker cLinker, SymbolLookup symbolLookup,
             String name, MethodType methodType, FunctionDescriptor functionDescriptor) throws IOException {
-        final Optional<LibraryLookup.Symbol> optionalSymbol = libraryLookup.lookup(name);
-        if (optionalSymbol.isEmpty())
+        final Optional<MemoryAddress> oSymbolAddress = symbolLookup.lookup(name);
+        if (oSymbolAddress.isEmpty())
             throw new IOException("couldn't library lookup for symbol: " + name);
-        final MethodHandle mh = cLinker.downcallHandle(optionalSymbol.get(), methodType, functionDescriptor);
+        final MethodHandle mh = cLinker.downcallHandle(oSymbolAddress.get(), methodType, functionDescriptor);
         return mh;
     }
 

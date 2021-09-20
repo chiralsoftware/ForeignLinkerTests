@@ -3,12 +3,13 @@ package chiralsoftware.linkerwebp;
 import java.nio.ByteOrder;
 import static java.nio.ByteOrder.nativeOrder;
 import java.util.logging.Logger;
+import static jdk.incubator.foreign.CLinker.C_INT;
+import static jdk.incubator.foreign.CLinker.C_POINTER;
 import jdk.incubator.foreign.GroupLayout;
 import jdk.incubator.foreign.MemoryAddress;
 import jdk.incubator.foreign.MemoryLayout;
 import static jdk.incubator.foreign.MemoryLayout.PathElement.groupElement;
-import static jdk.incubator.foreign.MemoryLayout.ofPaddingBits;
-import static jdk.incubator.foreign.MemoryLayout.ofValueBits;
+import static jdk.incubator.foreign.MemoryLayout.paddingLayout;
 import jdk.incubator.foreign.MemorySegment;
 
 /**
@@ -35,59 +36,59 @@ public final class Picture {
 
     private static final Logger LOG = Logger.getLogger(Picture.class.getName());
     
-    public static final GroupLayout Picture = MemoryLayout.ofStruct(
+    public static final GroupLayout Picture = MemoryLayout.structLayout(
             // To select between ARGB and YUVA input.
-            ofValueBits(32, ByteOrder.nativeOrder()).withName("use_argb"),
+            C_INT.withName("use_argb"),
             // Used if use_argb = 0
             // colorspace: should be YUVA420 or YUV420 for now (=Y'CbCr).
-            ofValueBits(32, ByteOrder.nativeOrder()).withName("colorspace"),
+            C_INT.withName("colorspace"),
             // width
-            ofValueBits(32, ByteOrder.nativeOrder()).withName("width"),
+            C_INT.withName("width"),
             // height
-            ofValueBits(32, ByteOrder.nativeOrder()).withName("height"),
+            C_INT.withName("height"),
             // pointers to uint8_t (unsigned byte) luma / chroma planes
-            ofValueBits(8*8, nativeOrder()).withName("y"),
-            ofValueBits(8*8, nativeOrder()).withName("u"),
-            ofValueBits(8*8, nativeOrder()).withName("v"),
+            C_POINTER.withName("y"),
+            C_POINTER.withName("u"),
+            C_POINTER.withName("v"),
             // luma/chroma strides.
-            ofValueBits(32, ByteOrder.nativeOrder()).withName("y_stride"),
-            ofValueBits(32, ByteOrder.nativeOrder()).withName("uv_stride"),
+            C_INT.withName("y_stride"),
+            C_INT.withName("uv_stride"),
             // pointer to the alpha plane uint8_t 
-            ofValueBits(8*8, ByteOrder.nativeOrder()).withName("a"),
-            ofValueBits(32, ByteOrder.nativeOrder()).withName("a_stride"),
-            ofPaddingBits(2 * 32), // padding for later use
-            ofPaddingBits(4 * 8), // this showed up when using pahole
+            C_POINTER.withName("a"),
+            C_INT.withName("a_stride"),
+            paddingLayout(2 * 32), // padding for later use
+            paddingLayout(4 * 8), // this showed up when using pahole
             // Alternate ARGB input, recommended for lossless compression.
             //
             // Used if use_argb = 1.
             // Pointer to argb (32 bit) plane, uint32_t* argb
-            ofValueBits(8*8, ByteOrder.nativeOrder()).withName("argb"),
+            C_POINTER.withName("argb"),
             // This is stride in pixels units, not bytes.
-            ofValueBits(32, nativeOrder()).withName("argb_stride"),
-            ofPaddingBits(3 * 32), // padding for later use
+            C_INT.withName("argb_stride"),
+            paddingLayout(3 * 32), // padding for later use
             
             // OUTPUT
             // Byte-emission hook, to store compressed bytes as they are ready.
-            ofValueBits(8*8, nativeOrder()).withName("writer"), // can be null
-            ofValueBits(8*8, nativeOrder()).withName("custom_ptr"), // *void
-            ofValueBits(32, nativeOrder()).withName("extra_info_type"), 
-            ofPaddingBits(4*8), // from pahole
-            ofValueBits(8*8,nativeOrder()).withName("extra_info"), // pointer to extra info 
-            ofValueBits(8*8, nativeOrder()).withName("stats"), // WebPAuxStats* stats
+            C_POINTER.withName("writer"), // can be null
+            C_POINTER.withName("custom_ptr"), // *void
+            C_INT.withName("extra_info_type"), 
+            paddingLayout(4*8), // from pahole
+            C_POINTER.withName("extra_info"), // pointer to extra info 
+            C_POINTER.withName("stats"), // WebPAuxStats* stats
             // Error code for the latest error encountered during encoding
-            ofValueBits(32, ByteOrder.nativeOrder()).withName("error_code"),
-            ofPaddingBits(4*8), // from pahole
-            ofValueBits(8*8, nativeOrder()).withName("progress_hook"), // WebPProgressHook
-            ofValueBits(8*8, nativeOrder()).withName("user_data"), // void* user_data
-            ofPaddingBits(32 * 3), // padding for later use
-            ofPaddingBits(4*8), // from pahole
-            ofPaddingBits(8*8), // *pad4
-            ofPaddingBits(8*8), // *pad5
-            ofPaddingBits(32 * 8), // pad6
+            C_INT.withName("error_code"),
+            paddingLayout(4*8), // from pahole
+            C_POINTER.withName("progress_hook"), // WebPProgressHook
+            C_POINTER.withName("user_data"), // void* user_data
+            paddingLayout(32 * 3), // padding for later use
+            paddingLayout(4*8), // from pahole
+            paddingLayout(8*8), // *pad4
+            paddingLayout(8*8), // *pad5
+            paddingLayout(32 * 8), // pad6
             // PRIVATE FIELDS
-            ofValueBits(8*8, nativeOrder()).withName("memoyr_"), // row chunk of memory for yuv
-            ofValueBits(8*8, nativeOrder()).withName("memory_argb_"), // and for argb
-            ofValueBits(8*8 * 2, nativeOrder()) // padding for later use
+            C_POINTER.withName("memoyr_"), // row chunk of memory for yuv
+            C_POINTER.withName("memory_argb_"), // and for argb
+            paddingLayout(8*8 * 2) // padding for later use
     ).withBitAlignment(64);
     
     static {

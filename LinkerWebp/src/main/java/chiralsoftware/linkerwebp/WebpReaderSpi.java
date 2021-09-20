@@ -1,15 +1,11 @@
 package chiralsoftware.linkerwebp;
 
-import chiralsoftware.linkerwebp.impl.LibWebp;
 import chiralsoftware.linkerwebp.impl.WebpImageReader;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.logging.Logger;
 import javax.imageio.ImageReader;
 import javax.imageio.spi.ImageReaderSpi;
-import jdk.incubator.foreign.LibraryLookup;
 
 /**
  *
