@@ -21,6 +21,8 @@ import jdk.incubator.foreign.MemoryAddress;
  * Interface to LibWebp. Note: there will be some changes with JDK 17. See:
  * https://blog.arkey.fr/2021/09/04/a-practical-look-at-jep-412-in-jdk17-with-libsodium/
  * for a good reference on that.
+ * To run, this will require:
+ * --enable-native-access=ALL-UNNAMED --add-modules jdk.incubator.foreign
  */
 public final class LibWebp {
 
@@ -40,7 +42,8 @@ public final class LibWebp {
 
     static {
         try {
-            System.loadLibrary(libraryName);
+            System.load(libraryPath);
+//            System.loadLibrary(libraryName);
             libWebp = new LibWebp();
         } catch (IOException ioe) {
             LOG.log(WARNING, "couldn't load libwebp", ioe);
