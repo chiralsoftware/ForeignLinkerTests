@@ -13,13 +13,18 @@
     
     <dependencies>
         <dependency>
-            <groupId>chiralsoftware.webp</groupId>
-            <artifactId>LinkerWebp</artifactId>
-            <version>1.0-SNAPSHOT</version>
+            <groupId>com.chiralsoftware</groupId>
+            <artifactId>libwebp4j</artifactId>
+            <version>0.0.1</version>
         </dependency>
+<!--        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>31.0.1-jre</version>
+        </dependency>-->
     </dependencies>
     
-<!--    <build>
+    <!--    <build>
         <plugins>
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>

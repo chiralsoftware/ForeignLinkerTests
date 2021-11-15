@@ -3,11 +3,6 @@ package chiralsoftware.webptest.webptest;
 import java.awt.color.ColorSpace;
 import java.awt.image.BufferedImage;
 import java.io.File;
-import static java.lang.System.out;
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
-import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Iterator;
@@ -19,7 +14,7 @@ import javax.imageio.ImageTypeSpecifier;
 /**
  * Test the ImageIO WebP plugin
  */
-public class Main {
+public final class Main {
 
     private static final Logger LOG = Logger.getLogger(Main.class.getName());
     
@@ -39,9 +34,11 @@ public class Main {
     } 
     
     public static void main(String[] args) throws Throwable {
-        LOG.info("Testing this out!");
+        LOG.info("Write a WEBP!");
         
-        LOG.info("and now for the next thing: write a WEBP!");
+        // read a webp image too
+//        final BufferedImage webpInput = ImageIO.read(new File("/tmp/input.webp"));
+//        LOG.info("I read in an input: " + webpInput.getWidth() + "x" + webpInput.getHeight());
         
         final BufferedImage inputImage = ImageIO.read(new File("/tmp/test.jpg"));
         LOG.info("read an image, " + inputImage.getWidth() + "x" + inputImage.getHeight());

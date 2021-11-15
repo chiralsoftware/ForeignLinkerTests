@@ -1,6 +1,6 @@
 package chiralsoftware.webptest.webptest;
 
-import chiralsoftware.linkerwebp.WebpUtils;
+import com.chiralsoftware.libwebp4j.impl.WebpUtils;
 import java.awt.color.ColorSpace;
 import java.awt.image.BufferedImage;
 import java.awt.image.ColorModel;
