@@ -3,8 +3,7 @@ package chiralsoftware.linkerwebp;
 import java.nio.ByteOrder;
 import static java.nio.ByteOrder.nativeOrder;
 import java.util.logging.Logger;
-import static jdk.incubator.foreign.CLinker.C_INT;
-import static jdk.incubator.foreign.CLinker.C_POINTER;
+import static jdk.incubator.foreign.ValueLayout.OfInt.OfInt;
 import jdk.incubator.foreign.GroupLayout;
 import jdk.incubator.foreign.MemoryAddress;
 import jdk.incubator.foreign.MemoryLayout;
@@ -38,7 +37,7 @@ public final class Picture {
     
     public static final GroupLayout Picture = MemoryLayout.structLayout(
             // To select between ARGB and YUVA input.
-            C_INT.withName("use_argb"),
+            OfInt..withName("use_argb"),
             // Used if use_argb = 0
             // colorspace: should be YUVA420 or YUV420 for now (=Y'CbCr).
             C_INT.withName("colorspace"),

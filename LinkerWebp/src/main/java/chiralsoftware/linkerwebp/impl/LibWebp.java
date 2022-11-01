@@ -18,6 +18,7 @@ import jdk.incubator.foreign.SymbolLookup;
 import jdk.incubator.foreign.MemoryAddress;
 
 /**
+ * 
  * Interface to LibWebp. Note: there will be some changes with JDK 17. See:
  * https://blog.arkey.fr/2021/09/04/a-practical-look-at-jep-412-in-jdk17-with-libsodium/
  * for a good reference on that.
